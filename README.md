@@ -73,3 +73,50 @@ export default defineConfig([
   },
 ])
 ```
+# Tumalove (v1.0.0) 🇰🇪
+
+Tumalove (formerly Project Shikilia) is a direct-support platform enabling fans to tip Kenyan creators via M-Pesa. 
+
+## 🏗 System Architecture
+
+### 1. The Stack
+- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS (Lucide React for icons).
+- **Backend:** Supabase (PostgreSQL, Auth, Realtime).
+- **Compute:** Supabase Edge Functions (Deno).
+- **Payments:** Safaricom M-Pesa Daraja API (STK Push).
+
+### 2. Payment Flow (The "Triple-Strategy")
+To solve the "Zombie Transaction" issue (where users pay but the UI freezes), we utilize a resilient 3-layer listener strategy:
+1.  **Realtime (WebSocket):** Listens for `INSERT/UPDATE` on the `transactions` table. Primary success path.
+2.  **Polling (Fallback):** Checks the DB every 2 seconds in case the WebSocket drops.
+3.  **Timeout (Safety):** Hard reset after 150 seconds if M-Pesa fails to respond.
+
+### 3. Security & Logic
+- **Guest Access:** Public users can pay without login. `mpesa-stk-push` Edge Function has JWT Verification DISABLED.
+- **Fraud Detection:** - The `mpesa-callback` Edge Function compares the `amount` paid vs `amount` requested.
+    - Phone numbers are normalized (07xx -> 2547xx) before comparison.
+- **Idempotency:** The callback handles duplicate requests from Safaricom gracefully.
+- **Privacy:** Frontend queries explicitly exclude sensitive columns (phone numbers) from public views.
+
+### 4. Database Schema (Key Tables)
+- `transactions`: Stores payment state (`PENDING`, `COMPLETED`, `FAILED`).
+- `profiles`: Creator details linked to Supabase Auth.
+- `security_audit_log`: Tracks payment anomalies and errors.
+
+## 🚀 Setup & Deploy
+
+### Environment Variables
+Required in `.env.local` and Supabase Secrets:
+- `VITE_SUPABASE_URL`: Public API URL.
+- `VITE_SUPABASE_ANON_KEY`: Public Anon Key.
+- `SUPABASE_SERVICE_ROLE_KEY`: (Backend only) For Edge Functions.
+- `MPESA_CONSUMER_KEY`: Daraja API.
+- `MPESA_CONSUMER_SECRET`: Daraja API.
+- `MPESA_PASSKEY`: Daraja API.
+
+### Deployment
+1. Frontend: Vercel / Netlify (`npm run build`).
+2. Backend: `supabase functions deploy mpesa-stk-push` & `mpesa-callback`.
+
+---
+*© 2025 Tumalove Inc.*
