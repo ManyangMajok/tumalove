@@ -16,6 +16,7 @@ import Settings from './pages/Settings'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminLogin from './pages/AdminLogin'
 import AdminAuth from './components/AdminAuth'
+import Transactions from './pages/Transactions';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
 
         {/* ───────── CREATOR ROUTES ───────── */}
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/transactions" element={<Transactions />} />
         <Route path="/setup" element={<CreatorSetup />} />
         <Route path="/settings" element={<Settings />} />
 

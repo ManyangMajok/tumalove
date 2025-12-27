@@ -1,5 +1,3 @@
-// supabase/functions/mpesa-stk-push/index.ts
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -22,13 +20,14 @@ serve(async (req) => {
     )
 
     // 3. Parse Request
+    // We are now reading 'supporterName' and 'message' correctly
     const { phoneNumber, amount, accountReference, creatorId, message, supporterName } = await req.json()
 
     if (!phoneNumber || !amount || !creatorId) {
       throw new Error('Missing required fields')
     }
 
-    console.log(`Initiating payment for ${phoneNumber}, Amount: ${amount}`)
+    console.log(`Initiating payment for ${phoneNumber}, Amount: ${amount}, Name: ${supporterName}`)
 
     // 4. Generate M-Pesa Auth Token
     const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY')
@@ -36,8 +35,7 @@ serve(async (req) => {
     const passkey = Deno.env.get('MPESA_PASSKEY')
     const shortcode = Deno.env.get('MPESA_SHORTCODE') // Paybill or Till
     
-    // Default callback URL (Must be publicly accessible)
-    // For local dev, use ngrok. For production, use your Supabase Function URL
+    // Default callback URL
     const callbackUrl = Deno.env.get('MPESA_CALLBACK_URL') || `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`
 
     const auth = btoa(`${consumerKey}:${consumerSecret}`)
@@ -61,13 +59,13 @@ serve(async (req) => {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline", // or CustomerBuyGoodsOnline
-      Amount: Math.floor(amount), // Ensure integer
+      TransactionType: "CustomerPayBillOnline",
+      Amount: Math.floor(amount),
       PartyA: phoneNumber,
       PartyB: shortcode,
       PhoneNumber: phoneNumber,
       CallBackURL: callbackUrl,
-      AccountReference: accountReference || "Shikilia",
+      AccountReference: accountReference || "Tumalove",
       TransactionDesc: "Tip Payment"
     }
 
@@ -89,27 +87,32 @@ serve(async (req) => {
     }
 
     // 7. CRITICAL STEP: Insert into Database IMMEDIATELY
-    // This is the part that was failing/missing before
+    // 🔥 UPDATED: Now mapping supporter_name and supporter_message to columns
     const { error: dbError } = await supabaseClient
       .from('transactions')
       .insert({
         creator_id: creatorId,
         amount: amount,
         phone_number: phoneNumber,
-        checkout_request_id: mpesaData.CheckoutRequestID, // Key for tracking
+        checkout_request_id: mpesaData.CheckoutRequestID,
         merchant_request_id: mpesaData.MerchantRequestID,
         status: 'PENDING',
+        
+        // --- MAP COLUMNS HERE ---
+        supporter_name: supporterName || 'Anonymous', // <--- Fixes the "Anonymous" bug
+        supporter_message: message || '',             // <--- Fixes the missing message bug
+        
+        // We keep metadata as backup
         metadata: {
             message: message,
             supporter_name: supporterName,
-            account_reference: accountReference
+            account_reference: accountReference,
+            stk_initiated_at: new Date().toISOString()
         }
       })
 
     if (dbError) {
       console.error('Database Insert Error:', dbError)
-      // We don't throw here because M-Pesa already sent the prompt
-      // But we should return a warning
     }
 
     // 8. Return Success to Frontend

@@ -1,4 +1,3 @@
-// utils/paymentSecurity.ts - UPDATED VERSION
 import { supabase } from '../supabaseClient'
 
 export class PaymentSecurity {
@@ -58,10 +57,18 @@ export class PaymentSecurity {
       throw new Error('Too many requests. Please wait a moment.')
     }
 
+    // 🔥 FIX: Sanitize Payload
+    // This ensures supporterName and message are never undefined when they hit the server
+    const finalPayload = {
+      ...payload,
+      supporterName: payload.supporterName || 'Anonymous',
+      message: payload.message || ''
+    }
+
     try {
       // 2. Use Supabase's built-in function invocation
       const { data, error } = await supabase.functions.invoke('mpesa-stk-push', {
-        body: payload,
+        body: finalPayload, // <--- Send the sanitized payload
       })
 
       if (error) {
@@ -74,7 +81,7 @@ export class PaymentSecurity {
       console.log('Payment request error:', error)
       
       // Fallback to fetch if invoke fails
-      return await this.fallbackPaymentRequest(payload)
+      return await this.fallbackPaymentRequest(finalPayload) // <--- Send sanitized payload to fallback too
     }
   }
 
