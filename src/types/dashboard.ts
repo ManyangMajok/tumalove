@@ -6,9 +6,12 @@ export interface Transaction {
   created_at: string;
   status: string;
   mpesa_code: string;
+  net_amount?: number;   // What you actually earn
+  platform_fee?: number; // The 5% fee
 }
 
 export interface Profile {
+    id: string;
   username: string;
   full_name: string;
   avatar_url: string;

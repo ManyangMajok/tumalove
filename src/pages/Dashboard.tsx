@@ -8,10 +8,14 @@ import BalanceCard from '../components/dashboard/BalanceCard';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import RecentActivity from '../components/dashboard/RecentActivity';
 import Leaderboard from '../components/dashboard/Leaderboard';
+import WithdrawalModal from '../components/dashboard/WithdrawalModal'; // New Import
 
 export default function Dashboard() {
-  const { loading, profile, transactions, topSupporters, totalEarnings } = useDashboardData();
+  // Now fetching 'balances' instead of just 'totalEarnings'
+  const { loading, profile, transactions, topSupporters, balances } = useDashboardData();
+  
   const [copied, setCopied] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false); // Modal State
 
   const copyLink = () => { 
     const baseUrl = window.location.origin.replace('http://', '').replace('https://', '');
@@ -31,11 +35,13 @@ export default function Dashboard() {
       <main className="max-w-5xl mx-auto px-6 py-8 grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-8">
           
-          {/* FIX: Use totalEarnings here if goal_current is 0 or incorrect */}
+          {/* UPDATED: Pass split balances and withdrawal handler */}
           <BalanceCard 
-             balance={totalEarnings || profile?.goal_current || 0} 
+             available={balances.available_balance}
+             pending={balances.pending_balance}
              copied={copied} 
              onCopyLink={copyLink} 
+             onWithdraw={() => setIsWithdrawOpen(true)}
           />
 
           <StatsOverview transactions={transactions} />
@@ -50,6 +56,15 @@ export default function Dashboard() {
           <Leaderboard supporters={topSupporters} />
         </div>
       </main>
+
+      {/* NEW: Withdrawal Modal */}
+      <WithdrawalModal 
+        isOpen={isWithdrawOpen} 
+        onClose={() => setIsWithdrawOpen(false)}
+        balance={balances.available_balance}
+        userId={profile?.id}
+        onSuccess={() => window.location.reload()} // Simple refresh to update balance
+      />
     </div>
   );
 }

@@ -1,13 +1,27 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { Profile, Transaction, TopSupporter } from '../types/dashboard';
+
+// New Interface for the Balances Table
+interface CreatorBalance {
+  available_balance: number;
+  pending_balance: number;
+  lifetime_earnings: number;
+}
 
 export function useDashboardData() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  
+  // NEW: State for Balances
+  const [balances, setBalances] = useState<CreatorBalance>({
+    available_balance: 0,
+    pending_balance: 0,
+    lifetime_earnings: 0
+  });
 
   useEffect(() => {
     fetchData();
@@ -18,6 +32,7 @@ export function useDashboardData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/login'); return; }
 
+      // 1. Fetch Profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -27,11 +42,23 @@ export function useDashboardData() {
       if (!profileData?.mpesa_number) { navigate('/setup'); return; }
       setProfile(profileData);
 
+      // 2. NEW: Fetch Real Balances (The Truth Source)
+      const { data: balanceData } = await supabase
+        .from('creator_balances')
+        .select('available_balance, pending_balance, lifetime_earnings')
+        .eq('creator_id', user.id)
+        .maybeSingle(); // Use maybeSingle in case they are new and row doesn't exist yet
+
+      if (balanceData) {
+        setBalances(balanceData);
+      }
+
+      // 3. Fetch Transactions (For display only, not for math)
       const { data: txData } = await supabase
         .from('transactions')
         .select('*')
         .eq('creator_id', user.id)
-        .in('status', ['COMPLETED', 'SUCCESS']) // Strict Filter
+        .in('status', ['COMPLETED', 'SUCCESS'])
         .order('created_at', { ascending: false });
 
       if (txData) setTransactions(txData);
@@ -43,23 +70,24 @@ export function useDashboardData() {
     }
   };
 
-  // Logic: Calculate Total Earnings directly from history
-  const totalEarnings = useMemo(() => {
-    return transactions.reduce((sum, tx) => sum + tx.amount, 0);
-  }, [transactions]);
-
-  const topSupporters = useMemo(() => {
-    const map: Record<string, TopSupporter> = {};
-    transactions.forEach((tx) => {
+  // Top Supporters Logic (Stays the same - purely visual)
+  const topSupporters = transactions.reduce<Record<string, TopSupporter>>((acc, tx) => {
       const name = tx.supporter_name || 'Anonymous';
-      if (!map[name]) map[name] = { name, totalAmount: 0, count: 0 };
-      map[name].totalAmount += tx.amount;
-      map[name].count += 1;
-    });
-    return Object.values(map)
+      if (!acc[name]) acc[name] = { name, totalAmount: 0, count: 0 };
+      acc[name].totalAmount += tx.amount; // Rank by Gross Amount (Generosity)
+      acc[name].count += 1;
+      return acc;
+  }, {});
+
+  const sortedSupporters = Object.values(topSupporters)
       .sort((a, b) => b.totalAmount - a.totalAmount)
       .slice(0, 3);
-  }, [transactions]);
 
-  return { loading, profile, transactions, topSupporters, totalEarnings };
+  return { 
+    loading, 
+    profile, 
+    transactions, 
+    topSupporters: sortedSupporters,
+    balances // <--- Return the real balances
+  };
 }

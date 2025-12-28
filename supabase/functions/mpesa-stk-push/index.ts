@@ -20,7 +20,6 @@ serve(async (req) => {
     )
 
     // 3. Parse Request
-    // We are now reading 'supporterName' and 'message' correctly
     const { phoneNumber, amount, accountReference, creatorId, message, supporterName } = await req.json()
 
     if (!phoneNumber || !amount || !creatorId) {
@@ -86,28 +85,36 @@ serve(async (req) => {
       throw new Error(mpesaData.errorMessage || 'M-Pesa request failed')
     }
 
+    // ---------------------------------------------------------
+    // 💰 REVENUE LOGIC: CALCULATE 5% FEE
+    // ---------------------------------------------------------
+    const COMMISSION_RATE = 0.05; // 5%
+    const platformFee = Math.floor(amount * COMMISSION_RATE); // Round down to integer
+    const netAmount = amount - platformFee; // This is what the creator gets
+
     // 7. CRITICAL STEP: Insert into Database IMMEDIATELY
-    // 🔥 UPDATED: Now mapping supporter_name and supporter_message to columns
     const { error: dbError } = await supabaseClient
       .from('transactions')
       .insert({
         creator_id: creatorId,
-        amount: amount,
+        amount: amount,            // Gross Amount (What supporter paid)
+        platform_fee: platformFee, // Your Revenue
+        net_amount: netAmount,     // Creator Balance
+        
         phone_number: phoneNumber,
         checkout_request_id: mpesaData.CheckoutRequestID,
         merchant_request_id: mpesaData.MerchantRequestID,
         status: 'PENDING',
         
-        // --- MAP COLUMNS HERE ---
-        supporter_name: supporterName || 'Anonymous', // <--- Fixes the "Anonymous" bug
-        supporter_message: message || '',             // <--- Fixes the missing message bug
+        supporter_name: supporterName || 'Anonymous', // Fixes "Anonymous" bug
+        supporter_message: message || '',             // Fixes missing message bug
         
-        // We keep metadata as backup
         metadata: {
             message: message,
             supporter_name: supporterName,
             account_reference: accountReference,
-            stk_initiated_at: new Date().toISOString()
+            stk_initiated_at: new Date().toISOString(),
+            fee_calculation: "5%"
         }
       })
 
