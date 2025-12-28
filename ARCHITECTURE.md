@@ -57,3 +57,26 @@ If this breaks, stop all payouts immediately.
 3.  **Idempotency:** Always pass a UUID when requesting money to prevent double-clicks.
 4.  **Reconciliation:** Check the `escrow_reconciliation` view daily. The `reconciliation_gap` column must always be 0.
 3. Next Steps for the Team
+
+
+
+# Admin System Architecture (v1.0)
+
+## 1. Access Control Strategy
+The Admin system uses a "Defense in Depth" strategy:
+1.  **Obscurity:** The login route is hidden (Configurable in `src/features/admin/config.ts`).
+2.  **Identity:** Access requires Email/Password + TOTP (Google Authenticator).
+3.  **Network:** Access is restricted to whitelisted IPs via `admin_allowed_ips` table.
+4.  **Data:** RLS policies block read access to admin tables unless the session is `aal2` verified.
+
+## 2. Financial Workflow
+Money movement follows a strict maker-checker flow:
+1.  **Request:** Creator clicks "Withdraw" -> RPC `request_withdrawal` locks funds (moves from `Available` to `Pending`).
+2.  **Queue:** Admin views `Pending` requests in the Payout Queue.
+3.  **Approval:** Admin clicks "Approve" -> RPC `complete_withdrawal` executes the transfer and updates the Ledger.
+
+## 3. Disaster Recovery
+If the `LedgerAuditor` component turns RED (Reconciliation Gap != 0):
+1.  System automatically logs the discrepancy.
+2.  Admins must halt all payouts.
+3.  Database "Circuit Breaker" can be toggled in `system_config` to freeze all RPCs.
