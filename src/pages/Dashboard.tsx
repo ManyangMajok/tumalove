@@ -8,14 +8,13 @@ import BalanceCard from '../components/dashboard/BalanceCard';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import RecentActivity from '../components/dashboard/RecentActivity';
 import Leaderboard from '../components/dashboard/Leaderboard';
-import WithdrawalModal from '../components/dashboard/WithdrawalModal'; // New Import
+import WithdrawalModal from '../components/dashboard/WithdrawalModal';
+import WithdrawalHistory from '../components/dashboard/WithdrawalHistory'; // <--- New Import
 
 export default function Dashboard() {
-  // Now fetching 'balances' instead of just 'totalEarnings'
   const { loading, profile, transactions, topSupporters, balances } = useDashboardData();
-  
   const [copied, setCopied] = useState(false);
-  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false); // Modal State
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
 
   const copyLink = () => { 
     const baseUrl = window.location.origin.replace('http://', '').replace('https://', '');
@@ -33,9 +32,9 @@ export default function Dashboard() {
       <DashboardHeader profile={profile} onCopyLink={copyLink} />
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid md:grid-cols-3 gap-8">
+        
+        {/* LEFT COLUMN (2/3 width) - Earnings & Activity */}
         <div className="md:col-span-2 space-y-8">
-          
-          {/* UPDATED: Pass split balances and withdrawal handler */}
           <BalanceCard 
              available={balances.available_balance}
              pending={balances.pending_balance}
@@ -52,18 +51,21 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* RIGHT COLUMN (1/3 width) - Sidebar */}
         <div className="space-y-6">
           <Leaderboard supporters={topSupporters} />
+          
+          {/* NEW: Withdrawal History Widget */}
+          <WithdrawalHistory userId={profile?.id} />
         </div>
       </main>
 
-      {/* NEW: Withdrawal Modal */}
       <WithdrawalModal 
         isOpen={isWithdrawOpen} 
         onClose={() => setIsWithdrawOpen(false)}
         balance={balances.available_balance}
         userId={profile?.id}
-        onSuccess={() => window.location.reload()} // Simple refresh to update balance
+        onSuccess={() => window.location.reload()}
       />
     </div>
   );
