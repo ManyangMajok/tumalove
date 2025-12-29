@@ -1,25 +1,83 @@
-import type { ReactNode } from 'react';
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShieldCheck, CreditCard, AlertTriangle, LogOut, LayoutGrid, Menu, X, ChevronRight } from 'lucide-react';
-import { supabase } from '../../../supabaseClient';
-import { ADMIN_ROOT } from '../config';
+import { useState } from 'react'
+import { Link, useLocation, useNavigate, Outlet, Navigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  ShieldCheck,
+  CreditCard,
+  AlertTriangle,
+  LogOut,
+  LayoutGrid,
+  Menu,
+  X,
+  ChevronRight,
+  Loader2
+} from 'lucide-react'
+import { supabase } from '../../../supabaseClient'
+import { ADMIN_ROOT } from '../config'
+import { useAdminAuth } from '../hooks/useAdminAuth'
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+export default function AdminLayout() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const queryClient = useQueryClient()
+
+  // ─── AUTH CHECK (LAYOUT AS GATEKEEPER) ───
+  const { loading, isAdmin } = useAdminAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />
+  }
+  // ───────────────────────────────────────
 
   const navItems = [
     { path: `${ADMIN_ROOT}/dashboard`, label: 'Overview', icon: LayoutGrid },
     { path: `${ADMIN_ROOT}/payouts`, label: 'Payouts', icon: CreditCard },
+    { path: `${ADMIN_ROOT}/verifications`, label: 'Verifications', icon: ShieldCheck },
     { path: `${ADMIN_ROOT}/security`, label: 'Security', icon: AlertTriangle },
-  ];
+  ]
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate(`${ADMIN_ROOT}/login`);
-  };
+    await supabase.auth.signOut()
+    navigate(`${ADMIN_ROOT}/login`)
+  }
+
+  const prefetchRoute = (path: string) => {
+    if (path.includes('payouts')) {
+      queryClient.prefetchQuery({
+        queryKey: ['withdrawals', 'queue'],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('withdrawals')
+            .select('*')
+            .eq('status', 'PENDING')
+          return data
+        },
+      })
+    }
+
+    if (path.includes('verifications')) {
+      queryClient.prefetchQuery({
+        queryKey: ['verifications', 'pending'],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('verification_status', 'pending')
+          return data
+        },
+      })
+    }
+  }
 
   const NavContent = () => (
     <>
@@ -29,21 +87,28 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <ShieldCheck size={20} />
         </div>
         <div>
-          <h2 className="font-bold text-slate-800 tracking-tight leading-none">Tumalove</h2>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Admin Portal</span>
+          <h2 className="font-bold text-slate-800 tracking-tight leading-none">
+            Tumalove
+          </h2>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            Admin Portal
+          </span>
         </div>
       </div>
 
-      {/* Navigation Items */}
+      {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          // Highlight item if the current path starts with the nav path
-          const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+        {navItems.map(item => {
+          const isActive =
+            location.pathname === item.path ||
+            location.pathname.startsWith(item.path + '/')
+
           return (
             <Link
               key={item.path}
               to={item.path}
               onClick={() => setIsMobileMenuOpen(false)}
+              onMouseEnter={() => prefetchRoute(item.path)}
               className={`group flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 font-medium text-sm ${
                 isActive
                   ? 'bg-green-50 text-green-700 border border-green-100 shadow-sm'
@@ -53,17 +118,23 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <div className="flex items-center gap-3">
                 <item.icon
                   size={18}
-                  className={isActive ? 'text-green-600' : 'text-slate-400 group-hover:text-slate-600'}
+                  className={
+                    isActive
+                      ? 'text-green-600'
+                      : 'text-slate-400 group-hover:text-slate-600'
+                  }
                 />
                 {item.label}
               </div>
-              {isActive && <ChevronRight size={14} className="text-green-600 opacity-50" />}
+              {isActive && (
+                <ChevronRight size={14} className="text-green-600 opacity-50" />
+              )}
             </Link>
-          );
+          )
         })}
       </nav>
 
-      {/* Logout Button */}
+      {/* Logout */}
       <div className="p-4 border-t border-slate-100">
         <button
           onClick={handleLogout}
@@ -74,7 +145,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </button>
       </div>
     </>
-  );
+  )
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex font-sans text-slate-900">
@@ -84,14 +155,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-40 px-4 py-3 flex items-center justify-between shadow-sm">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 px-4 py-3 flex items-center justify-between
+        bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white">
             <ShieldCheck size={16} />
           </div>
           <span className="font-bold text-slate-800">Tumalove Admin</span>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-100 rounded-lg">
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 bg-slate-100 rounded-lg"
+        >
           <Menu size={20} className="text-slate-600" />
         </button>
       </div>
@@ -116,7 +191,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-72 pt-16 lg:pt-0 p-6 lg:p-10 max-w-7xl mx-auto w-full">{children}</main>
+      <main className="flex-1 lg:ml-72 min-h-screen flex flex-col pt-16 lg:pt-0">
+        <div className="flex-1 p-4 md:p-8 lg:p-10 max-w-7xl mx-auto w-full animate-in fade-in duration-500">
+          <Outlet />
+        </div>
+      </main>
     </div>
-  );
+  )
 }

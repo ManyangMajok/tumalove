@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import QRCode from 'qrcode';
-import AdminLayout from '../layouts/AdminLayout';
+
 import { Loader2, Trash2, CheckCircle, Smartphone, Copy, ArrowRight, AlertTriangle, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ADMIN_ROOT } from '../config'; // <--- IMPORT
@@ -88,7 +88,7 @@ export default function MfaSetup() {
   };
 
   return (
-    <AdminLayout>
+    <>
       <div className="min-h-[80vh] flex items-center justify-center p-4">
         <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
           
@@ -198,6 +198,6 @@ export default function MfaSetup() {
           </div>
         </div>
       </div>
-    </AdminLayout>
+    </>
   );
 }

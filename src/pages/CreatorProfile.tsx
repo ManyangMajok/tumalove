@@ -6,7 +6,7 @@ import { formatPhoneNumber } from '../utils/formatters'
 import { paymentSecurity } from '../utils/paymentSecurity'
 import { 
   Loader2, 
-  ShieldCheck, 
+  BadgeCheck, // <--- CHANGED: Using BadgeCheck for the Instagram look
   Globe, 
   Instagram, 
   Twitter, 
@@ -194,7 +194,7 @@ export default function CreatorProfile() {
       // Generate a unique reference for this payment
       const checkoutId = `tip_${profile.id}_${Date.now()}`
       
-    /*  console.log('🚀 Sending payment request:', {
+    /* console.log('🚀 Sending payment request:', {
         phone: formattedPhone,
         amount: amount,
         creatorId: profile.id,
@@ -290,7 +290,7 @@ export default function CreatorProfile() {
             return
           }
 
-        /*  console.log('🔍 Polling database for checkout:', currentCheckoutId.current)*/
+        /* console.log('🔍 Polling database for checkout:', currentCheckoutId.current)*/
           const transaction = await checkDatabaseStatus(currentCheckoutId.current)
           
           if (transaction) {
@@ -474,12 +474,10 @@ export default function CreatorProfile() {
                         />
                     </button>
 
-                    <div className="flex items-center justify-center gap-2 mb-1">
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
                         <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight drop-shadow-sm line-clamp-1">{profile.full_name}</h1>
-                        <div className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">
-                          <ShieldCheck className="w-3 h-3" />
-                          <span className="hidden sm:inline">Verified</span>
-                        </div>
+                        {/* CHANGED: Instagram Style Blue Badge */}
+                        <BadgeCheck className="w-6 h-6 text-white fill-blue-500 flex-shrink-0" />
                     </div>
                     <p className="text-gray-700 font-bold text-xs sm:text-sm mb-4 sm:mb-6 tracking-wide">@{profile.username}</p>
 
@@ -522,9 +520,10 @@ export default function CreatorProfile() {
                                                 key={amt}
                                                 type="button"
                                                 onClick={() => setAmount(amt)}
+                                                // CHANGED: Fixed Active State to use Solid Green (bg-green-600) for visibility
                                                 className={`h-10 sm:h-12 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center
                                                     ${amount === amt 
-                                                        ? 'bg-Tumalove-green text-white border-Tumalove-green shadow-md shadow-green-200' 
+                                                        ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-200' 
                                                         : 'bg-white text-gray-500 border-gray-200 hover:border-green-300'}
                                                 `}
                                             >
@@ -709,7 +708,7 @@ export default function CreatorProfile() {
                     <p className="text-gray-500 text-sm sm:text-base">@{profile.username}</p>
                     <div className="mt-3 flex items-center justify-center gap-1">
                         <div className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-                          <ShieldCheck className="w-3 h-3" />
+                          <BadgeCheck className="w-3 h-3 text-white fill-blue-500" />
                           <span>Verified Creator</span>
                         </div>
                     </div>

@@ -1,21 +1,51 @@
 import { useState, useMemo } from 'react';
-import { Download, Search } from 'lucide-react';
-import { useDashboardData } from '../hooks/useDashboardData';
+import { Download, Search, Loader2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { useRealtimeQuery } from '../hooks/useRealtimeQuery';
+import { useUser } from '../layouts/HeadlessAuth'; // <--- 1. INSTANT USER ACCESS
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 
 type TimeFilter = 'all' | '30_days' | '6_months' | 'this_year';
 
 export default function Transactions() {
-  const { transactions, loading, profile } = useDashboardData();
+  // 1. GET USER INSTANTLY (No waiting)
+  const { user } = useUser();
+  
   const [filter, setFilter] = useState<TimeFilter>('all');
   const [search, setSearch] = useState('');
+  const [, setCopied] = useState(false); // Add missing state for header
 
-  // Filtering Logic
+  // 2. 🔥 THE SPEED ENGINE (Fetches data immediately)
+  const { data: pageData, isLoading } = useRealtimeQuery(
+    ['transactions_page', user.id], 
+    'transactions', 
+    async () => {
+      // Parallel fetch: Profile (for header) + ALL Transactions (for history)
+      const [profileReq, txReq] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('creator_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(500) // Get more history for this page
+      ]);
+
+      return {
+        profile: profileReq.data,
+        transactions: txReq.data || []
+      };
+    }
+  );
+
+  // 3. FILTERING LOGIC (Kept exactly the same)
   const filteredData = useMemo(() => {
+    if (!pageData?.transactions) return [];
+    
     const now = new Date();
     const searchLower = search.toLowerCase();
 
-    return transactions.filter(tx => {
+    return pageData.transactions.filter((tx: any) => {
       const matchesSearch =
         (tx.supporter_name || '').toLowerCase().includes(searchLower) ||
         (tx.supporter_message || '').toLowerCase().includes(searchLower);
@@ -29,20 +59,36 @@ export default function Transactions() {
 
       return true;
     });
-  }, [transactions, filter, search]);
+  }, [pageData?.transactions, filter, search]);
 
   const totalAmount = filteredData.reduce((sum, tx) => sum + tx.amount, 0);
 
-  const copyLink = () => {
-    /* Add your existing copy logic or pass it down */
+  // 4. COPY LINK LOGIC
+  const copyLink = () => { 
+    const baseUrl = window.location.origin.replace(/(^\w+:|^)\/\//, '');
+    const username = pageData?.profile?.username;
+    if (username) {
+        const link = `${window.location.protocol}//${baseUrl}/${username}`; 
+        navigator.clipboard.writeText(link); 
+        setCopied(true); 
+        setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  if (loading) {
-    return <div className="p-10 text-center text-sm text-gray-500">Loading records...</div>;
+  if (isLoading || !pageData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin opacity-50" />
+      </div>
+    );
   }
 
+  const { profile } = pageData;
+
   return (
-    <div className="min-h-screen bg-[#FAFAF9] font-sans text-gray-900">
+    <div className="min-h-screen bg-[#FAFAF9] font-sans text-gray-900 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      
+      {/* Header needs 'copied' prop if your component uses it, otherwise ignore */}
       <DashboardHeader profile={profile} onCopyLink={copyLink} />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -52,7 +98,7 @@ export default function Transactions() {
             <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
             <p className="text-sm text-gray-500">Manage your earnings and support history.</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 bg-white rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700 shadow-sm">
+          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 bg-white rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700 shadow-sm transition-colors">
             <Download className="w-4 h-4" /> Export CSV
           </button>
         </div>
@@ -64,7 +110,7 @@ export default function Transactions() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold rounded-md ${
+                className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
                   filter === f
                     ? 'bg-white text-emerald-700 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
@@ -82,7 +128,7 @@ export default function Transactions() {
             <input
               type="text"
               placeholder="Search name or message..."
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -123,8 +169,8 @@ export default function Transactions() {
                     </td>
                   </tr>
                 ) : (
-                  filteredData.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-gray-50 group">
+                  filteredData.map((tx: any) => (
+                    <tr key={tx.id} className="hover:bg-gray-50 group transition-colors">
                       
                       {/* DATE */}
                       <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
