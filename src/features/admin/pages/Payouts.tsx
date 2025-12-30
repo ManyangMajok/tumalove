@@ -1,3 +1,4 @@
+//src\features\admin\pages\Payouts.tsx
 import { useState } from 'react';
 import { supabase } from '../../../supabaseClient';
 

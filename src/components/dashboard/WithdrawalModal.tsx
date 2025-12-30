@@ -1,3 +1,4 @@
+//src\components\dashboard\WithdrawalModal.tsx
 import { useState } from 'react';
 import { X, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
